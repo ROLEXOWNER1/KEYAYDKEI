@@ -582,6 +582,29 @@ def handle_file(message):
         # Optionally, delete the file after processing to save space
         # os.remove(file_path)
 
+# Define the owner chat ID or username (for sending feedback)
+OWNER_CHAT_ID = 6906270448  # Example group chat ID
+OWNER_USERNAME = '@RARExOWNER'  # Bot owner's username, make sure it is correct
+
+# Collect feedback from the user
+@bot.message_handler(commands=['feedback'])
+def collect_feedback(message):
+    # Ask the user to provide their feedback
+    bot.send_message(message.chat.id, "Please provide your feedback:")
+    
+    # Collect the actual feedback (use a conversation handler or wait for message)
+    @bot.message_handler(func=lambda msg: True)
+    def get_feedback(msg):
+        feedback_message = msg.text
+        try:
+            # Send the feedback to the owner (group chat or username)
+            bot.send_message(OWNER_CHAT_ID, f"Feedback from {msg.from_user.username} ({msg.from_user.id}):\n\n{feedback_message}")
+            bot.send_message(msg.chat.id, "Thank you for your feedback!")
+        except Exception as e:
+            # Handle the case where the bot can't send the message
+            bot.send_message(msg.chat.id, "Sorry, there was an error sending your feedback. Please try again later.")
+            print(f"Error sending feedback: {e}")
+
 
 # Error handler
 @bot.message_handler(func=lambda message: True)
