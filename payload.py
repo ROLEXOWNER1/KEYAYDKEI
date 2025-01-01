@@ -6,6 +6,7 @@ import os
 import random
 import string
 import re
+import time
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 
@@ -145,6 +146,8 @@ def show_help(message):
 /payload1 <code>size</code> - Gᴇɴᴇʀᴀᴛᴇ Pᴀʏʟᴏᴀᴅ Oғ Gɪᴠᴇɴ Sɪᴢᴇ Iɴ Kʙ like this = \\x74\\x6d\\x75\\
 /payload2 <code>size</code> - Gᴇɴᴇʀᴀᴛᴇ Pᴀʏʟᴏᴀᴅ Oғ Gɪᴠᴇɴ Sɪᴢᴇ Iɴ Kʙ like this = 0x4e, 0xfe, 0x78
 /payload3 <code>up.bin copy paste here </code> - Gᴇɴᴇʀᴀᴛᴇ Pᴀʏʟᴏᴀᴅ 
+/payload4 <code> give hex file up.bin or down.bin </code> Gᴇɴᴇʀᴀᴛᴇ Pᴀʏʟᴏᴀᴅ 
+/info <code> to know info </code> 
 /genkey - Gᴇɴᴇʀᴀᴛᴇ A Nᴇᴡ Kᴇʏ (Aᴅᴍɪɴ Oɴʟʏ)
 /feedback - Sᴇɴᴅ Yᴏᴜʀ Fᴇᴇᴅʙᴀᴄᴋ 📝
 /status - Cʜᴇᴄᴋ Yᴏᴜʀ Sᴛᴀᴛᴜs ✨
@@ -508,6 +511,105 @@ def generate_payload3_from_hex(hex_string):
     
     return hex_payload
 
+# Helper function to convert hex string to payload in \\xhh format
+def hex_to_payload_escape(hex_string):
+    try:
+        # Ensure the hex string has an even number of characters
+        if len(hex_string) % 2 != 0:
+            raise ValueError("Hex string must have an even length.")
+        
+        # Convert the hex string into bytes
+        payload = bytes.fromhex(hex_string)
+        
+        # Convert the bytes into the '\\xhh' format string
+        escape_payload = ''.join(f'\\\\x{byte:02x}' for byte in payload)
+        
+        return escape_payload
+    except ValueError as e:
+        return f"Error: {e}"
+
+# Helper function to validate file type and size
+def validate_file(file):
+    # Check if the file is a valid binary file (or any other validation you want)
+    if file.mime_type not in ['application/octet-stream']:  # Change based on your file types
+        return False, "Invalid file type. Only binary files are supported."
+
+    # Check file size (limit is 20MB for Telegram, but you can adjust)
+    if file.file_size > 20 * 1024 * 1024:  # 20MB max
+        return False, "File size exceeds the maximum limit of 20MB."
+
+    return True, None
+
+# Store the start time when the bot starts
+start_time = time.time()
+
+def get_bot_uptime():
+    """
+    Returns the bot's uptime as a formatted string.
+    """
+    uptime_seconds = time.time() - start_time  # Calculate the uptime in seconds
+    uptime_hours = uptime_seconds // 3600  # Hours
+    uptime_minutes = (uptime_seconds % 3600) // 60  # Minutes
+    uptime_seconds = uptime_seconds % 60  # Remaining seconds
+
+    return f"{int(uptime_hours)}h {int(uptime_minutes)}m {int(uptime_seconds)}s"
+
+# Example usage:
+print(get_bot_uptime())  # This will print the bot's uptime in the format "Xh Ym Zs"
+
+@bot.message_handler(commands=['info'])
+def show_info(message):
+    info_text = '''
+    🤖 This is your Father's Bot Service!  
+    🔑 Access premium services with a valid key.
+    📱 Join the channels to use the bot.
+    🕑 Current uptime: {uptime}
+    '''
+    uptime = get_bot_uptime()  # Example function to calculate bot uptime
+    bot.reply_to(message, info_text.format(uptime=uptime))
+
+# Command handler for `/payload4`
+@bot.message_handler(commands=['payload4'])
+def handle_payload_command(message):
+    bot.reply_to(message, "Please send a binary file, and I will generate the payload for you.")
+
+# Handler for file uploads (when the user sends a file)
+@bot.message_handler(content_types=['document'])
+def handle_file(message):
+    # Check if the message contains a document (file)
+    if message.document:
+        file_id = message.document.file_id
+        
+        # Get the file from Telegram servers
+        file_info = bot.get_file(file_id)
+        file_path = file_info.file_path
+
+        # Download the file
+        downloaded_file = bot.download_file(file_path)
+
+        # Validate file type and size
+        is_valid, error_message = validate_file(message.document)
+        if not is_valid:
+            bot.reply_to(message, error_message)
+            return
+
+        # Read the file content and convert it to a hex string
+        hex_string = downloaded_file.hex()
+
+        # Convert the hex string to the payload format
+        payload = hex_to_payload_escape(hex_string)
+
+        # Send the payload to the user
+        bot.reply_to(message, f"Here is the payload:\n`{payload}`", parse_mode="Markdown")
+
+        # Optionally, delete the file after processing to save space
+        # os.remove(file_path)
+
+
+# Error handler
+@bot.message_handler(func=lambda message: True)
+def handle_error(message):
+    bot.reply_to(message, "Sorry, something went wrong. Please try again.")
 
 
 # Main loop to run the bot
